@@ -38,7 +38,14 @@
     <div class="top-bar">
         <h2>Gallery</h2>
         <div>
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <span style="color: #28a745; margin-right: 15px; font-weight: bold;">{{ messages[0] }}</span>
+                {% endif %}
+            {% endwith %}
+
             <button id="theme-toggle">Theme</button>
+            <a href="{{ url_for('register') }}"><button style="background: #28a745; margin-right: 5px;">Add User</button></a>
             <a href="{{ url_for('logout') }}"><button style="background: #dc3545;">Logout</button></a>
         </div>
     </div>

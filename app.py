@@ -136,6 +136,32 @@ def delete_image(image_id):
     return redirect(url_for("index"))
 
 
+@app.route("/register", methods=["GET", "POST"])
+@login_required  # Protects the route so only logged-in users can create accounts
+def register():
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+
+        # Check if user already exists
+        user = User.query.filter_by(username=username).first()
+        if user:
+            flash("Username already exists. Please choose a different one.")
+            return redirect(url_for("register"))
+
+        # Create new user and hash the password
+        hashed_pw = generate_password_hash(password, method="pbkdf2:sha256")
+        new_user = User(username=username, password=hashed_pw)
+
+        db.session.add(new_user)
+        db.session.commit()
+
+        flash(f'User "{username}" created successfully!')
+        return redirect(url_for("index"))
+
+    return render_template("register.html")
+
+
 # --- AUTH ROUTES ---
 @app.route("/login", methods=["GET", "POST"])
 def login():
