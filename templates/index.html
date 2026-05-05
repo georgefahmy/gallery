@@ -15,7 +15,28 @@
         .image-card { background: var(--card-bg); border-radius: 8px; padding: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .image-card img { width: 100%; height: 200px; object-fit: cover; cursor: pointer; border-radius: 4px; }
         .metadata { font-size: 0.75rem; color: #777; margin-top: 5px; }
+        .lightbox {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            justify-content: center;
+            align-items: center;
+        }
 
+        #lightbox-img {
+            max-width: 90vw;
+            max-height: 90vh;
+            object-fit: contain;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 20px; right: 30px;
+            color: white; font-size: 40px; cursor: pointer;
+        }
         /* Drag and Drop Zone */
         #drop-zone {
             border: 2px dashed #007bff;
@@ -49,7 +70,10 @@
             <a href="{{ url_for('logout') }}"><button style="background: #dc3545;">Logout</button></a>
         </div>
     </div>
-
+    <div id="lightbox" class="lightbox">
+        <span class="close-btn" onclick="closeLightbox()">&times;</span>
+        <img id="lightbox-img" src="" alt="Viewer">
+    </div>
     <form class="search-bar" method="GET" action="/">
         <select name="folder">
             <option value="All">All Folders</option>
@@ -95,11 +119,24 @@
             const doc = document.documentElement;
             doc.setAttribute("data-theme", doc.getAttribute("data-theme") === "dark" ? "light" : "dark");
         });
-
+        const images = [
+            {% for image in images %}
+                "{{ url_for('static', filename='images/' + image.subfolder + '/' + image.filename) }}",
+            {% endfor %}
+        ];
         // Drag and Drop Logic
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
         const folderInput = document.getElementById('subfolder-input');
+
+        document.querySelectorAll('.image-card img').forEach((img, index) => {
+            img.addEventListener('dblclick', () => {
+                resetSequence();
+                currentSequenceIndex = index;
+                currentImageIndex = playbackSequence[currentSequenceIndex];
+                openLightbox();
+            });
+        });
 
         dropZone.addEventListener('click', () => fileInput.click());
 
