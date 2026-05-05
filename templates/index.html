@@ -136,12 +136,12 @@
 
     <div class="controls">
         <form class="search-row" method="GET" action="/">
-            <select name="folder">
+            <!-- <select name="folder">
                 <option value="All">All Folders</option>
                 {% for folder in folders %}
                 <option value="{{ folder }}" {% if folder == current_folder %}selected{% endif %}>{{ folder }}</option>
                 {% endfor %}
-            </select>
+            </select> -->
             <input type="text" name="search" placeholder="Search filenames..." value="{{ request.args.get('search', '') }}" style="flex-grow:1;">
             <button type="submit" class="btn-primary">Search</button>
 
@@ -154,7 +154,6 @@
 
         <div id="drop-zone">
             <p><strong>Drag & Drop Images Here</strong> or click to browse</p>
-            <input type="text" id="subfolder-input" placeholder="Subfolder name (optional)" style="width: 250px;">
             <input type="file" id="file-input" multiple accept="image/*" style="display: none;">
         </div>
     </div>
@@ -280,7 +279,7 @@
         function handleUpload(files) {
             const formData = new FormData();
             for (let f of files) formData.append('file', f);
-            formData.append('subfolder', document.getElementById('subfolder-input').value || 'Root');
+            formData.append('Root');
 
             fetch('/upload', { method: 'POST', body: formData })
                 .then(() => window.location.reload());
