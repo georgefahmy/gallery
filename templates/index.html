@@ -3,298 +3,280 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Photo Gallery</title>
+    <title>RV-7 N890GF</title>
     <style>
-        /* --- THEME VARIABLES --- */
+        /* --- BASE STYLES --- */
         :root {
-            --bg-color: #f4f4f9;
-            --text-color: #333;
-            --card-bg: #fff;
-            --menu-bg: #e9ecef;
-            --border-color: #ddd;
-        }
-        [data-theme="dark"] {
-            --bg-color: #1a1a1a;
-            --text-color: #f4f4f9;
-            --card-bg: #2d2d2d;
-            --menu-bg: #3b3b3b;
-            --border-color: #444;
+            --bg-color: #f8f9fa;
+            --text-color: #212529;
+            --card-bg: #ffffff;
+            --primary-color: #0056b3;
+            --secondary-color: #6c757d;
+            --border-color: #dee2e6;
+            --admin-color: #d63384; /* Distinct color for admin actions */
         }
 
         body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: var(--bg-color);
             color: var(--text-color);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            padding: 20px;
+            line-height: 1.6;
             margin: 0;
-            transition: background-color 0.3s, color 0.3s;
+            padding: 0;
         }
 
-        /* --- HEADER & TOP BAR --- */
-        .top-bar {
+        a { text-decoration: none; color: var(--primary-color); }
+        a:hover { text-decoration: underline; }
+
+        /* --- HEADER --- */
+        header {
+            background-color: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .header-content {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
         }
 
-        .controls {
-            background: var(--card-bg);
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        .header-content h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            color: #333;
         }
 
-        .search-row {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
+        .header-nav a {
+            margin-left: 15px;
+            font-weight: bold;
+            color: var(--secondary-color);
         }
 
-        /* --- DRAG & DROP --- */
-        #drop-zone {
-            border: 2px dashed #007bff;
-            border-radius: 8px;
-            padding: 30px;
-            text-align: center;
-            background: var(--card-bg);
-            margin-bottom: 20px;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-        #drop-zone.dragover { background: rgba(0, 123, 255, 0.1); }
-
-        /* --- GALLERY GRID --- */
-        .gallery {
+        /* --- MAIN LAYOUT --- */
+        .container {
+            max-width: 1100px;
+            margin: 40px auto;
+            padding: 0 20px;
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 25px;
+            grid-template-columns: 3fr 1fr;
+            gap: 40px;
         }
 
-        .image-card {
+        @media (max-width: 768px) {
+            .container { grid-template-columns: 1fr; }
+        }
+
+        /* --- POST FEED --- */
+        .post-card {
             background: var(--card-bg);
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            transition: transform 0.2s;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 30px;
+            transition: box-shadow 0.2s;
+            position: relative;
+        }
+
+        .post-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        .post-title {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 1.6rem;
+        }
+
+        .post-meta {
+            font-size: 0.85rem;
+            color: var(--secondary-color);
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .category-badge {
+            background: #e9ecef;
+            padding: 2px 8px;
+            border-radius: 12px;
+            color: #495057;
+            font-weight: 500;
+        }
+
+        .admin-edit-link {
+            color: var(--admin-color);
+            font-weight: bold;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border: 1px solid var(--admin-color);
+            padding: 2px 6px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .admin-edit-link:hover {
+            background: var(--admin-color);
+            color: white;
+            text-decoration: none;
+        }
+
+        .post-excerpt {
+            color: #555;
+            margin-bottom: 15px;
+        }
+
+        .read-more {
+            font-weight: bold;
+            display: inline-block;
+            margin-top: 10px;
+        }
+
+        /* --- SIDEBAR --- */
+        .sidebar-widget {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .sidebar-widget h3 {
+            margin-top: 0;
+            font-size: 1.2rem;
+            border-bottom: 2px solid var(--bg-color);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        .search-form { display: flex; }
+        .search-form input {
+            flex-grow: 1;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px 0 0 4px;
+        }
+        .search-form button {
+            padding: 8px 12px;
+            border: 1px solid var(--primary-color);
+            background: var(--primary-color);
+            color: white;
+            border-radius: 0 4px 4px 0;
+            cursor: pointer;
+        }
+
+        .category-list { list-style: none; padding: 0; margin: 0; }
+        .category-list li { margin-bottom: 8px; }
+        .category-list a { color: #555; }
+        .category-list a.active { font-weight: bold; color: var(--primary-color); }
+
+        .no-results {
+            text-align: center;
+            padding: 40px;
+            background: var(--card-bg);
+            border-radius: 8px;
             border: 1px solid var(--border-color);
         }
-        .image-card:hover { transform: translateY(-5px); }
-
-        .image-card img {
-            width: 100%;
-            height: 220px;
-            object-fit: cover;
-            display: block;
-            cursor: pointer;
-        }
-
-        .card-content { padding: 15px; }
-        .filename { font-weight: bold; display: block; margin-bottom: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .metadata { font-size: 0.75rem; color: #888; line-height: 1.4; }
-
-        /* --- BUTTONS & INPUTS --- */
-        button, input, select { padding: 10px; border-radius: 5px; border: 1px solid var(--border-color); font-size: 0.9rem; }
-        button { cursor: pointer; transition: 0.2s; border: none; }
-        .btn-primary { background: #007bff; color: white; }
-        .btn-success { background: #28a745; color: white; }
-        .btn-danger { background: #dc3545; color: white; width: 100%; margin-top: 10px; }
-        .btn-slideshow { background: #6f42c1; color: white; }
-
-        /* --- LIGHTBOX --- */
-        .lightbox {
-            display: none;
-            position: fixed;
-            z-index: 2000;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.95);
-            justify-content: center;
-            align-items: center;
-        }
-        #lightbox-img { max-width: 95vw; max-height: 95vh; object-fit: contain; }
-        .close-btn { position: absolute; top: 20px; right: 30px; color: white; font-size: 40px; cursor: pointer; z-index: 2001; }
-
-        :fullscreen #lightbox-img { max-width: 100vw; max-height: 100vh; }
     </style>
 </head>
 <body>
 
-    <div class="top-bar">
-        <h1>Gallery</h1>
-        <div>
-            {% with messages = get_flashed_messages() %}
-                {% if messages %}<span style="color: #28a745; margin-right: 15px;">{{ messages[0] }}</span>{% endif %}
-            {% endwith %}
-            <button onclick="toggleTheme()" class="btn-primary">Theme</button>
-            <a href="{{ url_for('register') }}"><button class="btn-success">Add User</button></a>
-            <a href="{{ url_for('logout') }}"><button style="background:#666; color:white;">Logout</button></a>
-        </div>
-    </div>
-
-    <div class="controls">
-        <form class="search-row" method="GET" action="/">
-            <!-- <select name="folder">
-                <option value="All">All Folders</option>
-                {% for folder in folders %}
-                <option value="{{ folder }}" {% if folder == current_folder %}selected{% endif %}>{{ folder }}</option>
-                {% endfor %}
-            </select> -->
-            <input type="text" name="search" placeholder="Search filenames..." value="{{ request.args.get('search', '') }}" style="flex-grow:1;">
-            <button type="submit" class="btn-primary">Search</button>
-
-            <div style="display:flex; gap:10px; align-items:center; border-left: 2px solid var(--border-color); padding-left:15px;">
-                <label><input type="checkbox" id="shuffle-toggle"> Shuffle</label>
-                <input type="number" id="duration-input" value="3" min="1" style="width:50px;">
-                <button type="button" id="start-slideshow" class="btn-slideshow">Start Slideshow</button>
+    <header>
+        <div class="header-content">
+            <h1><a href="{{ url_for('index') }}" style="color: inherit; text-decoration: none;">N890GF Logbook & Dev Journal</a></h1>
+            <div class="header-nav">
+                {% if current_user.is_authenticated %}
+                    <span style="font-size: 0.9rem; color: #888; margin-right: 10px;">Admin Mode</span>
+                    <a href="{{ url_for('manage_media') }}">Media Library</a>
+                    <a href="{{ url_for('new_post') }}">Write Post</a>
+                    <a href="{{ url_for('logout') }}">Logout</a>
+                {% else %}
+                    <a href="{{ url_for('login') }}">Admin Login</a>
+                {% endif %}
             </div>
-        </form>
-
-        <div id="drop-zone">
-            <p><strong>Drag & Drop Images Here</strong> or click to browse</p>
-            <input type="file" id="file-input" multiple accept="image/*" style="display: none;">
         </div>
-    </div>
+    </header>
 
-    <div class="gallery">
-        {% for image in images %}
-        <div class="image-card">
-            <img src="{{ url_for('static', filename='images/' + image.subfolder + '/' + image.filename) }}"
-                 loading="lazy"
-                 alt="{{ image.filename }}"
-                 onclick="handleImageClick({{ loop.index0 }})">
+    <div class="container">
+        <main>
+            {% if search_query %}
+                <h2 style="margin-top: 0; margin-bottom: 25px;">Search results for "{{ search_query }}"</h2>
+            {% elif current_cat %}
+                <h2 style="margin-top: 0; margin-bottom: 25px;">Category: {{ current_cat }}</h2>
+            {% endif %}
 
-            <div class="card-content">
-                <span class="filename" title="{{ image.filename }}">{{ image.filename }}</span>
-                <div class="metadata">
-                    Folder: {{ image.subfolder }}<br>
-                    Res: {{ image.resolution or 'N/A' }}<br>
-                    Cam: {{ image.camera_model or 'N/A' }}
+            {% if posts %}
+                {% for post in posts %}
+                <article class="post-card">
+                    <h2 class="post-title"><a href="{{ url_for('view_post', slug=post.slug) }}">{{ post.title }}</a></h2>
+
+                    <div class="post-meta">
+                        <span>{{ post.created_at.strftime('%B %d, %Y') }}</span>
+                        <span class="category-badge">{{ post.category.name }}</span>
+
+                        {# THE EDIT LINK - Visible only to logged-in admins #}
+                        {% if current_user.is_authenticated %}
+                            <a href="{{ url_for('edit_post', post_id=post.id) }}" class="admin-edit-link">Edit Post</a>
+                        {% endif %}
+                    </div>
+
+                    <div class="post-excerpt">
+                        {{ post.content | striptags | truncate(250) }}
+                    </div>
+
+                    {% if post.tags %}
+                        <div style="margin-bottom: 15px; font-size: 0.8rem;">
+                            {% for tag in post.tags %}
+                                <span style="color: var(--secondary-color); margin-right: 8px;">#{{ tag.name }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <a href="{{ url_for('view_post', slug=post.slug) }}" class="read-more">Read Full Post &rarr;</a>
+                </article>
+                {% endfor %}
+            {% else %}
+                <div class="no-results">
+                    <h3>No posts found.</h3>
+                    <p>Try broadening your search or choosing a different category.</p>
                 </div>
-                <form action="{{ url_for('delete_image', image_id=image.id) }}" method="post" onsubmit="return confirm('Delete image?');">
-                    <button type="submit" class="btn-danger">Delete</button>
+            {% endif %}
+        </main>
+
+        <aside>
+            <div class="sidebar-widget">
+                <h3>Search</h3>
+                <form class="search-form" action="{{ url_for('index') }}" method="GET">
+                    {% if current_cat %}
+                        <input type="hidden" name="category" value="{{ current_cat }}">
+                    {% endif %}
+                    <input type="text" name="q" placeholder="Search title or content..." value="{{ search_query }}">
+                    <button type="submit">Go</button>
                 </form>
             </div>
-        </div>
-        {% endfor %}
+
+            <div class="sidebar-widget">
+                <h3>Categories</h3>
+                <ul class="category-list">
+                    <li>
+                        <a href="{{ url_for('index') }}" class="{% if not current_cat %}active{% endif %}">All Posts</a>
+                    </li>
+                    {% for category in categories %}
+                    <li>
+                        <a href="{{ url_for('index', category=category.name) }}" class="{% if current_cat == category.name %}active{% endif %}">
+                            {{ category.name }}
+                        </a>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </aside>
     </div>
 
-    <div id="lightbox" class="lightbox">
-        <span class="close-btn" onclick="closeLightbox()">&times;</span>
-        <img id="lightbox-img" src="">
-    </div>
-
-    <script>
-        // --- DATA SETUP ---
-        const images = [
-            {% for image in images %}
-                "{{ url_for('static', filename='images/' + image.subfolder + '/' + image.filename) }}",
-            {% endfor %}
-        ];
-
-        let playbackSequence = [];
-        let currentSeqIndex = 0;
-        let slideshowInterval;
-
-        const lightbox = document.getElementById('lightbox');
-        const lightboxImg = document.getElementById('lightbox-img');
-
-        // --- THEME ---
-        function toggleTheme() {
-            const doc = document.documentElement;
-            const theme = doc.getAttribute("data-theme") === "dark" ? "light" : "dark";
-            doc.setAttribute("data-theme", theme);
-            localStorage.setItem("theme", theme);
-        }
-        if(localStorage.getItem("theme")) document.documentElement.setAttribute("data-theme", localStorage.getItem("theme"));
-
-        // --- LIGHTBOX LOGIC ---
-        function handleImageClick(index) {
-            resetSequence();
-            currentSeqIndex = index;
-            openLightbox();
-        }
-
-        function openLightbox() {
-            lightbox.style.display = 'flex';
-            updateLightbox();
-        }
-
-        function closeLightbox() {
-            if (document.fullscreenElement) document.exitFullscreen();
-            lightbox.style.display = 'none';
-            stopSlideshow();
-        }
-
-        function updateLightbox() {
-            const realIdx = playbackSequence[currentSeqIndex];
-            lightboxImg.src = images[realIdx];
-        }
-
-        function resetSequence() {
-            playbackSequence = Array.from({length: images.length}, (_, i) => i);
-        }
-
-        // --- SLIDESHOW ---
-        document.getElementById('start-slideshow').addEventListener('click', () => {
-            if (images.length === 0) return alert("No images!");
-
-            resetSequence();
-            if (document.getElementById('shuffle-toggle').checked) {
-                for (let i = playbackSequence.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [playbackSequence[i], playbackSequence[j]] = [playbackSequence[j], playbackSequence[i]];
-                }
-            }
-
-            currentSeqIndex = 0;
-            openLightbox();
-
-            if (lightbox.requestFullscreen) lightbox.requestFullscreen();
-
-            const dur = (parseInt(document.getElementById('duration-input').value) || 3) * 1000;
-            slideshowInterval = setInterval(() => {
-                currentSeqIndex = (currentSeqIndex + 1) % playbackSequence.length;
-                updateLightbox();
-            }, dur);
-        });
-
-        function stopSlideshow() {
-            clearInterval(slideshowInterval);
-            slideshowInterval = null;
-        }
-
-        // --- UPLOAD LOGIC ---
-        const dropZone = document.getElementById('drop-zone');
-        const fileInput = document.getElementById('file-input');
-
-        dropZone.onclick = () => fileInput.click();
-        dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('dragover'); };
-        dropZone.ondragleave = () => dropZone.classList.remove('dragover');
-        dropZone.ondrop = (e) => { e.preventDefault(); handleUpload(e.dataTransfer.files); };
-        fileInput.onchange = (e) => handleUpload(e.target.files);
-
-        function handleUpload(files) {
-            const formData = new FormData();
-            for (let f of files) formData.append('file', f);
-            formData.append('Root');
-
-            fetch('/upload', { method: 'POST', body: formData })
-                .then(() => window.location.reload());
-        }
-
-        // --- KEYBOARD ---
-        document.addEventListener('keydown', (e) => {
-            if (lightbox.style.display === 'flex') {
-                if (e.key === "Escape") closeLightbox();
-                if (e.key === "ArrowRight") { stopSlideshow(); currentSeqIndex = (currentSeqIndex + 1) % playbackSequence.length; updateLightbox(); }
-                if (e.key === "ArrowLeft") { stopSlideshow(); currentSeqIndex = (currentSeqIndex - 1 + playbackSequence.length) % playbackSequence.length; updateLightbox(); }
-            }
-        });
-
-        document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) closeLightbox(); });
-    </script>
 </body>
 </html>

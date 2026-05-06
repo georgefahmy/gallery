@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
@@ -12,13 +13,11 @@ from flask_login import (
 )
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
-from PIL import Image as PILImage
-from PIL.ExifTags import TAGS
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = "your_super_secret_key_change_this"
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///gallery.db"
-app.config["UPLOAD_FOLDER"] = os.path.join("static", "images")
+app.config["SECRET_KEY"] = "super_secret_blog_key"
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///blog.db"
+app.config["UPLOAD_FOLDER"] = os.path.join("static", "uploads")
 
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
@@ -26,21 +25,81 @@ login_manager.login_view = "login"
 
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
+# ==========================================
+# DATABASE MODELS
+# ==========================================
 
-# --- DATABASE MODELS ---
+
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(150), unique=True, nullable=False)
     password = db.Column(db.String(150), nullable=False)
 
 
-class ImageMeta(db.Model):
+post_tags = db.Table(
+    "post_tags",
+    db.Column("post_id", db.Integer, db.ForeignKey("post.id"), primary_key=True),
+    db.Column("tag_id", db.Integer, db.ForeignKey("tag.id"), primary_key=True),
+)
+
+# Association table for Many-to-Many relationship between Posts and Categories
+post_categories = db.Table(
+    "post_categories",
+    db.Column("post_id", db.Integer, db.ForeignKey("post.id"), primary_key=True),
+    db.Column(
+        "category_id", db.Integer, db.ForeignKey("category.id"), primary_key=True
+    ),
+)
+
+
+class Category(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False, unique=True)
+
+    # Self-referential relationship for nesting
+    parent_id = db.Column(db.Integer, db.ForeignKey("category.id"), nullable=True)
+    subcategories = db.relationship(
+        "Category", backref=db.backref("parent", remote_side=[id]), lazy="dynamic"
+    )
+
+
+class Post(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(150), nullable=False)
+    slug = db.Column(db.String(150), nullable=False, unique=True)
+    content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    tags = db.relationship(
+        "Tag", secondary=post_tags, backref=db.backref("posts", lazy=True)
+    )
+
+
+class Tag(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False, unique=True)
+
+
+class Post(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(150), nullable=False)
+    slug = db.Column(db.String(150), nullable=False, unique=True)
+    content = db.Column(db.Text, nullable=False)  # Stores raw HTML from JS editor
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    category_id = db.Column(db.Integer, db.ForeignKey("category.id"), nullable=False)
+    tags = db.relationship(
+        "Tag",
+        secondary=post_tags,
+        lazy="subquery",
+        backref=db.backref("posts", lazy=True),
+    )
+
+
+class Media(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     filename = db.Column(db.String(200), nullable=False)
-    subfolder = db.Column(db.String(200), default="Root")
     upload_date = db.Column(db.DateTime, default=datetime.utcnow)
-    resolution = db.Column(db.String(50))
-    camera_model = db.Column(db.String(100))
 
 
 @login_manager.user_loader
@@ -48,121 +107,230 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 
-# --- ROUTES ---
+# Helper to create URL-friendly slugs
+def generate_slug(title):
+    slug = re.sub(r"[^\w\s-]", "", title).strip().lower()
+    return re.sub(r"[-\s]+", "-", slug)
+
+
+# ==========================================
+# PUBLIC ROUTES
+# ==========================================
+
+
 @app.route("/")
-@login_required
 def index():
-    # Search and Filter logic
-    search_query = request.args.get("search", "")
-    folder_filter = request.args.get("folder", "Root")
+    search_query = request.args.get("q", "")
+    category_filter = request.args.get("category", "")
 
-    query = ImageMeta.query
+    query = Post.query
 
-    if folder_filter and folder_filter != "All":
-        query = query.filter_by(subfolder=folder_filter)
+    if category_filter:
+        query = query.join(Category).filter(Category.name == category_filter)
+
     if search_query:
-        query = query.filter(ImageMeta.filename.ilike(f"%{search_query}%"))
+        query = query.filter(
+            Post.title.ilike(f"%{search_query}%")
+            | Post.content.ilike(f"%{search_query}%")
+        )
 
-    images = query.order_by(ImageMeta.upload_date.desc()).all()
-
-    # Get distinct folders for the filter dropdown
-    folders = [f[0] for f in db.session.query(ImageMeta.subfolder).distinct().all()]
+    posts = query.order_by(Post.created_at.desc()).all()
+    categories = Category.query.all()
 
     return render_template(
-        "index.html", images=images, folders=folders, current_folder=folder_filter
+        "index.html",
+        posts=posts,
+        categories=categories,
+        current_cat=category_filter,
+        search_query=search_query,
     )
 
 
-@app.route("/upload", methods=["POST"])
+@app.route("/admin/edit/<int:post_id>", methods=["GET", "POST"])
 @login_required
-def upload_image():
-    if "file" not in request.files:
-        return jsonify({"error": "No file part"}), 400
+def edit_post(post_id):
+    post = Post.query.get_or_404(post_id)
 
-    files = request.files.getlist("file")
-    subfolder = request.form.get("subfolder", "Root")
-
-    # Create subfolder directory if it doesn't exist
-    target_dir = os.path.join(app.config["UPLOAD_FOLDER"], secure_filename(subfolder))
-    os.makedirs(target_dir, exist_ok=True)
-
-    for file in files:
-        if file and file.filename:
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(target_dir, filename)
-            file.save(filepath)
-
-            # Extract Metadata
-            resolution = "Unknown"
-            camera = "Unknown"
-            try:
-                with PILImage.open(filepath) as img:
-                    resolution = f"{img.width}x{img.height}"
-                    exif_data = img.getexif()
-                    if exif_data:
-                        for tag_id, value in exif_data.items():
-                            tag = TAGS.get(tag_id, tag_id)
-                            if tag == "Model":
-                                camera = str(value)
-            except Exception:
-                pass  # Skip metadata if file is not a valid image or lacks EXIF
-
-            # Save to Database
-            new_image = ImageMeta(
-                filename=filename,
-                subfolder=secure_filename(subfolder),
-                resolution=resolution,
-                camera_model=camera,
-            )
-            db.session.add(new_image)
-
-    db.session.commit()
-    return jsonify({"success": "Files uploaded successfully"})
-
-
-@app.route("/delete/<int:image_id>", methods=["POST"])
-@login_required
-def delete_image(image_id):
-    image = ImageMeta.query.get_or_404(image_id)
-    file_path = os.path.join(
-        app.config["UPLOAD_FOLDER"], image.subfolder, image.filename
-    )
-
-    if os.path.exists(file_path):
-        os.remove(file_path)
-
-    db.session.delete(image)
-    db.session.commit()
-    return redirect(url_for("index"))
-
-
-@app.route("/register", methods=["GET", "POST"])
-@login_required  # Protects the route so only logged-in users can create accounts
-def register():
     if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
+        post.title = request.form.get("title")
+        post.content = request.form.get("content")
+        category_name = request.form.get("category")
+        tags_input = request.form.get("tags", "")
 
-        # Check if user already exists
-        user = User.query.filter_by(username=username).first()
-        if user:
-            flash("Username already exists. Please choose a different one.")
-            return redirect(url_for("register"))
+        # Update Category
+        category = Category.query.filter_by(name=category_name).first()
+        if not category:
+            category = Category(name=category_name)
+            db.session.add(category)
+        post.category = category
 
-        # Create new user and hash the password
-        hashed_pw = generate_password_hash(password, method="pbkdf2:sha256")
-        new_user = User(username=username, password=hashed_pw)
+        # Update Tags
+        post.tags = []  # Clear existing associations
+        if tags_input:
+            tag_names = [t.strip().lower() for t in tags_input.split(",")]
+            for t_name in tag_names:
+                tag = Tag.query.filter_by(name=t_name).first() or Tag(name=t_name)
+                post.tags.append(tag)
 
-        db.session.add(new_user)
+        db.session.commit()
+        flash("Post updated successfully!")
+        return redirect(url_for("view_post", slug=post.slug))
+
+    categories = Category.query.all()
+    # Join tags back into a comma-separated string for the input field
+    tag_string = ", ".join([t.name for t in post.tags])
+    return render_template(
+        "editor.html", post=post, categories=categories, tag_string=tag_string
+    )
+
+
+@app.route("/admin/category/add", methods=["POST"])
+@login_required
+def add_category():
+    name = request.form.get("cat_name")
+    parent_id = request.form.get("parent_id")  # Can be None
+
+    new_cat = Category(name=name, parent_id=parent_id if parent_id else None)
+    db.session.add(new_cat)
+    db.session.commit()
+    return redirect(url_for("manage_media"))  # Or a dedicated settings page
+
+
+@app.route("/post/<slug>")
+def view_post(slug):
+    post = Post.query.filter_by(slug=slug).first_or_404()
+    return render_template("post.html", post=post)
+
+
+# ==========================================
+# ADMIN & EDITOR ROUTES
+# ==========================================
+
+
+@app.route("/admin/new_post", methods=["GET", "POST"])
+@login_required
+def new_post():
+    if request.method == "POST":
+        title = request.form.get("title")
+        content = request.form.get("content")  # The HTML from Quill/TinyMCE
+        category_name = request.form.get("category")
+        tags_input = request.form.get("tags", "")
+
+        # Handle Category
+        category = Category.query.filter_by(name=category_name).first()
+        if not category:
+            category = Category(name=category_name)
+            db.session.add(category)
+
+        # Handle Post Creation
+        slug = generate_slug(title)
+
+        # Ensure unique slug
+        base_slug = slug
+        counter = 1
+        while Post.query.filter_by(slug=slug).first():
+            slug = f"{base_slug}-{counter}"
+            counter += 1
+
+        new_post = Post(title=title, slug=slug, content=content, category=category)
+
+        # Handle Tags (comma separated)
+        if tags_input:
+            tag_names = [t.strip().lower() for t in tags_input.split(",")]
+            for t_name in tag_names:
+                if t_name:
+                    tag = Tag.query.filter_by(name=t_name).first()
+                    if not tag:
+                        tag = Tag(name=t_name)
+                        db.session.add(tag)
+                    new_post.tags.append(tag)
+
+        db.session.add(new_post)
         db.session.commit()
 
-        flash(f'User "{username}" created successfully!')
-        return redirect(url_for("index"))
+        flash("Post published successfully!")
+        return redirect(url_for("view_post", slug=new_post.slug))
 
-    return render_template("register.html")
+    categories = Category.query.all()
+    return render_template("editor.html", categories=categories)
 
 
-# --- AUTH ROUTES ---
+# --- JS Editor Image Upload API ---
+# The JS text editor will send an AJAX POST request here when you insert an image.
+@app.route("/admin/upload_media", methods=["POST"])
+@login_required
+def upload_media():
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"error": "No file selected"}), 400
+
+    filename = secure_filename(file.filename)
+    filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+
+    # Avoid overwriting files with the same name
+    base, ext = os.path.splitext(filename)
+    counter = 1
+    while os.path.exists(filepath):
+        filename = f"{base}_{counter}{ext}"
+        filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+        counter += 1
+
+    file.save(filepath)
+
+    # Save to media library DB
+    new_media = Media(filename=filename)
+    db.session.add(new_media)
+    db.session.commit()
+
+    # Return the URL so the JS editor can insert the <img> tag
+    image_url = url_for("static", filename=f"uploads/{filename}")
+    return jsonify({"url": image_url})
+
+
+@app.route("/admin/media", methods=["GET", "POST"])
+@login_required
+def manage_media():
+    if request.method == "POST":
+        if "file" not in request.files:
+            flash("No file part")
+            return redirect(request.url)
+
+        file = request.files["file"]
+        if file.filename == "":
+            flash("No selected file")
+            return redirect(request.url)
+
+        if file:
+            filename = secure_filename(file.filename)
+            # Handle duplicate names
+            base, ext = os.path.splitext(filename)
+            counter = 1
+            filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+            while os.path.exists(filepath):
+                filename = f"{base}_{counter}{ext}"
+                filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+                counter += 1
+
+            file.save(filepath)
+
+            new_media = Media(filename=filename)
+            db.session.add(new_media)
+            db.session.commit()
+            flash(f"Successfully uploaded {filename}")
+            return redirect(url_for("manage_media"))
+
+    all_media = Media.query.order_by(Media.upload_date.desc()).all()
+    return render_template("media.html", media_items=all_media)
+
+
+# ==========================================
+# AUTHENTICATION ROUTES
+# ==========================================
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -171,7 +339,7 @@ def login():
         user = User.query.filter_by(username=username).first()
         if user and check_password_hash(user.password, password):
             login_user(user)
-            return redirect(url_for("index"))
+            return redirect(url_for("new_post"))
         flash("Invalid credentials")
     return render_template("login.html")
 
@@ -180,17 +348,28 @@ def login():
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for("login"))
+    return redirect(url_for("index"))
 
+
+# ==========================================
+# INITIALIZATION
+# ==========================================
 
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
-        # Create a default admin user if none exists (Password: admin)
+
+        # Setup initial admin account
         if not User.query.filter_by(username="admin").first():
             hashed_pw = generate_password_hash("admin", method="pbkdf2:sha256")
             admin = User(username="admin", password=hashed_pw)
             db.session.add(admin)
-            db.session.commit()
+
+        # Setup default category to prevent errors
+        if not Category.query.filter_by(name="Uncategorized").first():
+            default_cat = Category(name="Uncategorized")
+            db.session.add(default_cat)
+
+        db.session.commit()
 
     app.run(debug=True)
