@@ -91,9 +91,12 @@
 
     <article class="post-container">
         <header>
-            <div class="post-meta">
-                {{ post.created_at.strftime('%B %d, %Y') }} —
-                In <a href="{{ url_for('index', category=post.category.name) }}" class="category-link">{{ post.category.name }}</a>
+            <div class="meta">
+                Posted on {{ post.created_at.strftime('%Y-%m-%d') }} |
+                Categories:
+                {% for cat in post.categories %}
+                    <a href="/?category={{ cat.name }}">{{ cat.name }}</a>{{ ", " if not loop.last }}
+                {% endfor %}
             </div>
             <h1>{{ post.title }}</h1>
         </header>

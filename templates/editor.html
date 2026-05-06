@@ -2,271 +2,116 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% if post %}Edit{% else %}New{% endif %} Post - Admin Dashboard</title>
-
+    <title>Editor - N890GF</title>
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
-
     <style>
-        :root {
-            --bg: #f4f7f6;
-            --text: #333;
-            --white: #ffffff;
-            --primary: #007bff;
-            --border: #ced4da;
+        body { font-family: sans-serif; background: #f4f7f6; padding: 40px; color: #333; }
+        .container { max-width: 850px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: bold; margin-bottom: 8px; }
+        input[type="text"] { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+
+        .category-box {
+            border: 1px solid #ddd; padding: 15px; border-radius: 4px; background: #fafafa;
         }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: var(--bg);
-            margin: 0;
-            padding: 20px;
-            color: var(--text);
+        .category-list {
+            display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; max-height: 150px; overflow-y: auto; margin-bottom: 15px;
         }
+        .cat-item { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
 
-        .editor-container {
-            max-width: 900px;
-            margin: 0 auto;
-            background: var(--white);
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
-        }
+        .quick-add { display: flex; gap: 10px; border-top: 1px solid #eee; padding-top: 15px; }
+        #editor { height: 400px; background: #fff; }
 
-        h2 { margin-top: 0; color: #1a1a1a; border-bottom: 2px solid var(--bg); padding-bottom: 15px; }
-
-        .form-group { margin-bottom: 25px; }
-        label { display: block; font-weight: 600; margin-bottom: 8px; color: #555; }
-
-        input[type="text"], select {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            box-sizing: border-box;
-            font-size: 1rem;
-            transition: border-color 0.2s;
-        }
-
-        input[type="text"]:focus, select:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-
-        /* Set Editor Height and Style */
-        #editor-wrapper { margin-bottom: 25px; }
-        #editor {
-            height: 450px;
-            border-radius: 0 0 6px 6px;
-            font-size: 1.1rem;
-        }
-        .ql-toolbar { border-radius: 6px 6px 0 0; background: #fafafa; }
-
-        .btn-group { display: flex; gap: 15px; align-items: center; }
-
-        .submit-btn {
-            background: #28a745;
-            color: white;
-            padding: 15px 30px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 1.1rem;
-            font-weight: bold;
-            flex-grow: 2;
-            transition: background 0.2s, transform 0.1s;
-        }
-
-        .submit-btn:hover { background: #218838; }
-        .submit-btn:active { transform: scale(0.98); }
-
-        .back-link {
-            display: inline-block;
-            color: #6c757d;
-            text-decoration: none;
-            font-size: 0.9rem;
-            margin-top: 20px;
-        }
-        .back-link:hover { color: var(--primary); }
-
-        /* Notification for image upload */
-        #upload-status {
-            font-size: 0.85rem;
-            margin-top: 5px;
-            color: var(--primary);
-            display: none;
-        }
+        .btn-save { background: #28a745; color: white; border: none; padding: 12px 30px; border-radius: 4px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div class="editor-container">
-    <h2>{% if post %}Edit Post{% else %}Create New Entry{% endif %}</h2>
-
-    <form id="post-form" method="POST" action="{% if post %}{{ url_for('edit_post', post_id=post.id) }}{% else %}{{ url_for('new_post') }}{% endif %}">
+<div class="container">
+    <h2>{% if post %}Edit Post{% else %}New Post{% endif %}</h2>
+    <form id="post-form" method="POST">
+        <div class="form-group">
+            <label>Title</label>
+            <input type="text" name="title" value="{{ post.title if post else '' }}" required>
+        </div>
 
         <div class="form-group">
-            <label for="title">Post Title</label>
-            <input type="text" name="title" id="title" placeholder="What is this post about?" value="{{ post.title if post else '' }}" required>
-        </div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-            <div class="form-group">
-                <label>Categories</label>
-                <div id="category-checklist" style="border: 1px solid #ddd; padding: 15px; border-radius: 6px; max-height: 200px; overflow-y: auto;">
+            <label>Categories</label>
+            <div class="category-box">
+                <div class="category-list" id="cat-list">
                     {% for cat in categories %}
-                        <div class="cat-item">
-                            <input type="checkbox" name="categories" value="{{ cat.id }}"
-                                {% if post and cat in post.categories %}checked{% endif %}>
-                            <strong>{{ cat.name }}</strong>
-
-                            {# Render Subcategories #}
-                            {% if cat.subcategories %}
-                                <div style="margin-left: 25px; border-left: 1px solid #eee; padding-left: 10px;">
-                                {% for sub in cat.subcategories %}
-                                    <div>
-                                        <input type="checkbox" name="categories" value="{{ sub.id }}"
-                                            {% if post and sub in post.categories %}checked{% endif %}>
-                                        {{ sub.name }}
-                                    </div>
-                                {% endfor %}
-                                </div>
-                            {% endif %}
-                        </div>
+                    <div class="cat-item">
+                        <input type="checkbox" name="categories" value="{{ cat.id }}"
+                               {% if post and cat in post.categories %}checked{% endif %}>
+                        {{ cat.name }}
+                    </div>
                     {% endfor %}
                 </div>
-            </div>
 
-            <div class="form-group">
-                <label for="tags">Tags (comma separated)</label>
-                <input type="text" name="tags" id="tags" placeholder="e.g. dev, n890gf, updates" value="{{ tag_string if post else '' }}">
+                <div class="quick-add">
+                    <input type="text" id="new-cat-name" placeholder="New category name..." style="flex:1;">
+                    <button type="button" onclick="addCategory()">Add</button>
+                </div>
             </div>
         </div>
 
-        <div class="form-group" id="editor-wrapper">
+        <div class="form-group">
             <label>Content</label>
             <div id="editor"></div>
-            <div id="upload-status">Uploading image...</div>
             <input type="hidden" name="content" id="content-input">
         </div>
 
-        <div class="btn-group">
-            <button type="submit" class="submit-btn">
-                {% if post %}Update Post{% else %}Publish Post{% endif %}
-            </button>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <a href="{{ url_for('index') }}" style="color: #666;">Cancel</a>
+            <button type="submit" class="btn-save">Save Post</button>
         </div>
     </form>
-
-    <a href="{{ url_for('index') }}" class="back-link">&larr; Cancel and return to home</a>
 </div>
 
 <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
-
 <script>
-    // 1. Setup Toolbar Options
-    const toolbarOptions = [
-        [{ 'header': [1, 2, 3, false] }],
-        ['bold', 'italic', 'underline', 'strike'],
-        ['blockquote', 'code-block'],
-        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-        ['link', 'image'],
-        ['clean']
-    ];
+    var quill = new Quill('#editor', { theme: 'snow', modules: { toolbar: [
+        [{'header': [1, 2, false]}], ['bold', 'italic', 'underline'], ['link', 'image', 'code-block'], [{'list': 'ordered'}, {'list': 'bullet'}]
+    ]}});
 
-    // 2. Initialize Editor
-    var quill = new Quill('#editor', {
-        theme: 'snow',
-        modules: {
-            toolbar: {
-                container: toolbarOptions,
-                handlers: {
-                    image: imageHandler
-                }
-            }
-        }
-    });
-
-    // 3. Load Existing Content (if editing)
     {% if post %}
-        // Safe injection of HTML from the server
-        quill.root.innerHTML = {{ post.content | tojson }};
+    quill.root.innerHTML = {{ post.content | tojson }};
     {% endif %}
 
-    // 4. Async Image Upload Handler
-    function imageHandler() {
-        const input = document.createElement('input');
-        input.setAttribute('type', 'file');
-        input.setAttribute('accept', 'image/*');
-        input.click();
+    function addCategory() {
+        const nameInput = document.getElementById('new-cat-name');
+        const name = nameInput.value.strip ? nameInput.value.trim() : nameInput.value;
+        if (!name) return;
 
-        input.onchange = () => {
-            const file = input.files[0];
-            const formData = new FormData();
-            formData.append('file', file);
+        const fd = new FormData();
+        fd.append('name', name);
 
-            const status = document.getElementById('upload-status');
-            status.style.display = 'block';
-
-            fetch('/admin/upload_media', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(result => {
-                status.style.display = 'none';
-                if (result.url) {
-                    const range = quill.getSelection();
-                    quill.insertEmbed(range.index, 'image', result.url);
-                } else {
-                    alert('Upload failed: ' + result.error);
-                }
-            })
-            .catch(err => {
-                status.style.display = 'none';
-                console.error('Upload Error:', err);
-            });
-        };
+        fetch('/admin/category/add', { method: 'POST', body: fd })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                // Instantly add to list and check it
+                const div = document.createElement('div');
+                div.className = 'cat-item';
+                div.innerHTML = `<input type="checkbox" name="categories" value="${data.id}" checked> ${data.name}`;
+                document.getElementById('cat-list').appendChild(div);
+                nameInput.value = '';
+            } else {
+                alert("Category already exists or error occurred.");
+            }
+        });
     }
 
-    // 5. Category Switching Logic
-    const categorySelect = document.getElementById('category');
-    const newCategoryInput = document.getElementById('new-category-input');
-
-    categorySelect.addEventListener('change', function() {
-        if (this.value === 'custom') {
-            newCategoryInput.style.display = 'block';
-            newCategoryInput.required = true;
-        } else {
-            newCategoryInput.style.display = 'none';
-            newCategoryInput.required = false;
-        }
-    });
-
-    // 6. Form Submission Preparation
-    const form = document.getElementById('post-form');
-    form.onsubmit = function() {
-        // Sync Quill HTML to hidden input
-        const contentInput = document.getElementById('content-input');
-        contentInput.value = quill.root.innerHTML;
-
-        // Verify content isn't empty
-        if (quill.getText().trim().length === 0 && quill.root.innerHTML.indexOf('<img') === -1) {
-            alert('Post content cannot be empty.');
-            return false;
-        }
-
-        // Handle custom category naming
-        if (categorySelect.value === 'custom') {
-            const options = categorySelect.options;
-            for (let i = 0; i < options.length; i++) {
-                if (options[i].value === 'custom') {
-                    options[i].value = newCategoryInput.value;
-                }
-            }
-        }
-
+    document.getElementById('post-form').onsubmit = function() {
+        document.getElementById('content-input').value = quill.root.innerHTML;
         return true;
     };
+    const titleInput = document.querySelector('input[name="title"]');
+
+    titleInput.addEventListener('input', function() {
+        // This regex finds the start of every word and capitalizes it
+        this.value = this.value.replace(/\b\w/g, (char) => char.toUpperCase());
+    });
 </script>
 
 </body>
