@@ -79,20 +79,27 @@ def app_handle_413(e):
     return jsonify({"error": "File is too large. Max size is 64MB."}), 413
 
 
+@app.context_processor
+def inject_categories():
+    return dict(categories=Category.query.order_by(Category.name).all())
+
+
 @app.route("/")
 def index():
+    search_query = request.args.get("search", "")
     cat_name = request.args.get("category", "")
     query = Post.query
+    if search_query:
+        query = query.filter(
+            Post.title.contains(search_query) | Post.content.contains(search_query)
+        )
     if cat_name:
         query = (
             query.join(post_categories).join(Category).filter(Category.name == cat_name)
         )
 
     posts = query.order_by(Post.created_at.desc()).all()
-    all_categories = Category.query.order_by(Category.name).all()
-    return render_template(
-        "index.html", posts=posts, categories=all_categories, current_cat=cat_name
-    )
+    return render_template("index.html", posts=posts, current_cat=cat_name)
 
 
 @app.route("/admin/new_post", methods=["GET", "POST"])

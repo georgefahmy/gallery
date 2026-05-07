@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}RV-7 N890GF{% endblock %}</title>
+    <style>
+        :root {
+            --nav-bg: #2c3e50;         /* Dark color for the top bar only */
+            --page-bg: #f4f7f6;        /* Light grey for the overall page */
+            --accent: #3498db;
+            --text-light: #ecf0f1;
+            scroll-behavior: smooth;
+            /* scroll-padding-top: 80px; */
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0;
+            background: var(--page-bg);
+        }
+
+        header {
+            background-color: var(--nav-bg); /* Use nav-specific color */
+            color: var(--text-light);
+            padding: 1rem 2rem;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            position: sticky;
+            top: 0;
+            z-index: 1000; /* Ensures the header stays above images and videos */
+        }
+
+        .brand { font-size: 1.5rem; font-weight: bold; text-decoration: none; color: white; }
+
+        .nav-group { display: flex; gap: 20px; align-items: center; }
+
+        .nav-link { color: white; text-decoration: none; font-size: 0.9rem; transition: 0.3s; }
+        .nav-link:hover { color: var(--accent); }
+
+        /* Dropdown Logic */
+        .dropdown { position: relative; display: inline-block; }
+        .dropbtn { background: none; border: none; color: white; cursor: pointer; font-size: 0.9rem; padding: 0; font-family: inherit; }
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: white;
+            min-width: 160px;
+            box-shadow: 0px 8px 16px rgba(0,0,0,0.2);
+            z-index: 1001;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .dropdown-content a {
+            color: #333;
+            padding: 12px 16px;
+            text-decoration: none;
+            display: block;
+            font-size: 0.85rem;
+        }
+        .dropdown-content a:hover { background-color: #f1f1f1; }
+        .dropdown:hover .dropdown-content { display: block; }
+
+        /* Search Bar */
+        .search-form { display: flex; background: rgba(255,255,255,0.1); border-radius: 20px; padding: 5px 15px; }
+        .search-form input {
+            background: none; border: none; color: white; outline: none; padding: 5px; font-size: 0.85rem;
+        }
+        .search-form input::placeholder { color: rgba(255,255,255,0.6); }
+
+        .container { padding: 2rem; max-width: 1200px; margin: 0 auto; }
+    </style>
+</head>
+<body>
+
+<header>
+    <a href="/" class="brand">RV-7 N890GF</a>
+
+    <div class="nav-group">
+        <a href="/" class="nav-link">Home</a>
+        <a href="/?latest=true" class="nav-link">Latest Posts</a>
+
+        <div class="dropdown">
+            <button class="dropbtn">Categories ▼</button>
+            <div class="dropdown-content">
+                {% for cat in categories %}
+                    <a href="/?category={{ cat.name }}">{{ cat.name }}</a>
+                {% endfor %}
+            </div>
+        </div>
+
+        <form action="/" method="GET" class="search-form">
+            <input type="text" name="search" placeholder="Search logs...">
+        </form>
+
+        {% if current_user.is_authenticated %}
+            <a href="{{ url_for('media_gallery') }}" class="nav-link">Media</a>
+            <a href="{{ url_for('new_post') }}" class="nav-link" style="background: var(--accent); padding: 5px 10px; border-radius: 4px;">+ Write</a>
+        {% endif %}
+    </div>
+</header>
+
+<div class="container">
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        {% for message in messages %}
+          <div style="background: #d4edda; padding: 10px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #c3e6cb;">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+</div>
+
+</body>
+</html>
