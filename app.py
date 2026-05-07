@@ -15,13 +15,14 @@ from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from urllib.parse import urlparse
 from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "n890gf-dev-secret"
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///blog_final.db"
 app.config["UPLOAD_FOLDER"] = os.path.join("static", "uploads")
-# ADD THIS LINE: Allow up to 16 Megabytes per request
-app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
+# ADD THIS LINE: Allow up to 64 Megabytes per request
+app.config["MAX_CONTENT_LENGTH"] = None
 
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
@@ -75,7 +76,7 @@ def load_user(user_id):
 @app.errorhandler(413)
 @app.errorhandler(RequestEntityTooLarge)
 def app_handle_413(e):
-    return jsonify({"error": "File is too large. Max size is 16MB."}), 413
+    return jsonify({"error": "File is too large. Max size is 64MB."}), 413
 
 
 @app.route("/")
@@ -118,7 +119,12 @@ def new_post():
         return redirect(url_for("view_post", slug=post.slug))
 
     categories = Category.query.order_by(Category.name).all()
-    return render_template("editor.html", categories=categories, post=None)
+    files = (
+        os.listdir(app.config["UPLOAD_FOLDER"])
+        if os.path.exists(app.config["UPLOAD_FOLDER"])
+        else []
+    )
+    return render_template("editor.html", categories=categories, post=None, files=files)
 
 
 @app.route("/admin/edit/<int:post_id>", methods=["GET", "POST"])
@@ -140,7 +146,12 @@ def edit_post(post_id):
         return redirect(url_for("view_post", slug=post.slug))
 
     categories = Category.query.order_by(Category.name).all()
-    return render_template("editor.html", post=post, categories=categories)
+    files = (
+        os.listdir(app.config["UPLOAD_FOLDER"])
+        if os.path.exists(app.config["UPLOAD_FOLDER"])
+        else []
+    )
+    return render_template("editor.html", post=post, categories=categories, files=files)
 
 
 @app.route("/admin/delete/<int:post_id>", methods=["POST"])
@@ -155,6 +166,26 @@ def delete_post(post_id):
     db.session.commit()
     flash("Post deleted successfully.")
     return redirect(url_for("index"))
+
+
+@app.route("/admin/media/upload", methods=["POST"])
+@login_required
+def upload_to_gallery():
+    if "file" not in request.files:
+        flash("No file part")
+        return redirect(request.url)
+
+    file = request.files["file"]
+    if file.filename == "":
+        flash("No selected file")
+        return redirect(request.url)
+
+    if file:
+        filename = secure_filename(file.filename)
+        file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+        flash(f"File {filename} uploaded successfully!")
+
+    return redirect(url_for("media_gallery"))
 
 
 @app.route("/admin/media")

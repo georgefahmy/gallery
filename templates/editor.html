@@ -23,6 +23,13 @@
         #editor { height: 400px; background: #fff; }
 
         .btn-save { background: #28a745; color: white; border: none; padding: 12px 30px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        /* Modal Styles */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); }
+        .modal-content { background: white; margin: 5% auto; padding: 20px; width: 80%; max-height: 80vh; overflow-y: auto; border-radius: 8px; }
+        .picker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; margin-top: 20px; }
+        .picker-card img { width: 100%; height: 100px; object-fit: cover; border-radius: 4px; cursor: pointer; border: 2px solid transparent; transition: 0.2s; }
+        .picker-card img:hover { border-color: #007bff; transform: scale(1.05); }
+        .close-modal { float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -56,9 +63,37 @@
         </div>
 
         <div class="form-group">
-            <label>Content</label>
+            <div class="form-group">
+                <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+                    <label>Content</label>
+                    <button type="button" onclick="openGallery()" style="margin-bottom: 8px; font-size: 0.8rem; cursor: pointer;">
+                        🖼️ Pick from Gallery
+                    </button>
+                </div>
+                <div id="editor"></div>
+                <input type="hidden" name="content" id="content-input">
+            </div>
+
+            <div id="galleryModal" class="modal">
+                <div class="modal-content">
+                    <span class="close-modal" onclick="closeGallery()">&times;</span>
+                    <h3>Select a Photo</h3>
+                    <div class="picker-grid">
+                        {% for file in files %}
+                            {% if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')) %}
+                                <div class="picker-card">
+                                    <img src="{{ url_for('static', filename='uploads/' + file) }}"
+                                        onclick="insertImage('{{ url_for('static', filename='uploads/' + file) }}')"
+                                        title="{{ file }}">
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <!-- <label>Content</label>
             <div id="editor"></div>
-            <input type="hidden" name="content" id="content-input">
+            <input type="hidden" name="content" id="content-input"> -->
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -70,9 +105,20 @@
 
 <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
 <script>
-    var quill = new Quill('#editor', { theme: 'snow', modules: { toolbar: [
-        [{'header': [1, 2, false]}], ['bold', 'italic', 'underline'], ['link', 'image', 'code-block'], [{'list': 'ordered'}, {'list': 'bullet'}]
-    ]}});
+    var quill = new Quill('#editor', {
+        theme: 'snow',
+        modules: {
+            toolbar: [
+                [{'header': [1, 2, false]}],
+                ['bold', 'italic', 'underline'],
+
+                // ADD 'video' TO THIS LINE
+                ['link', 'image', 'video', 'code-block'],
+
+                [{'list': 'ordered'}, {'list': 'bullet'}]
+            ]
+        }
+    });
 
     {% if post %}
     quill.root.innerHTML = {{ post.content | tojson }};
@@ -112,6 +158,31 @@
         // This regex finds the start of every word and capitalizes it
         this.value = this.value.replace(/\b\w/g, (char) => char.toUpperCase());
     });
+    function openGallery() {
+        document.getElementById('galleryModal').style.display = "block";
+    }
+
+    function closeGallery() {
+        document.getElementById('galleryModal').style.display = "none";
+    }
+
+    function insertImage(url) {
+        const range = quill.getSelection();
+        // If no cursor position, insert at the end
+        const position = range ? range.index : quill.getLength();
+
+        // Insert the image into the editor
+        quill.insertEmbed(position, 'image', window.location.origin + url);
+        closeGallery();
+    }
+
+    // Close modal if clicking outside the content box
+    window.onclick = function(event) {
+        const modal = document.getElementById('galleryModal');
+        if (event.target == modal) {
+            closeGallery();
+        }
+    }
 </script>
 
 </body>

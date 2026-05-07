@@ -64,7 +64,16 @@
             overflow-x: auto;
             font-family: 'Courier New', Courier, monospace;
         }
-
+                /* Add this to your existing styles */
+        .content iframe.ql-video {
+            width: 100%;
+            height: auto;
+            aspect-ratio: 16 / 9;
+            border-radius: 8px;
+            border: none;
+            margin: 20px 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
         /* --- FOOTER --- */
         footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid var(--border-color); font-family: sans-serif; }
         .tags { margin-bottom: 20px; }
