@@ -77,7 +77,7 @@ class Post(db.Model):
     tags = db.relationship(
         "Tag",
         secondary=post_tags,
-        backref=db.backref("posts", lazy="dynamic"),
+        backref=db.backref("posts", lazy="select"),
     )
 
 
@@ -105,21 +105,37 @@ def index():
     search_query = request.args.get("search", "")
     cat_name = request.args.get("category", "")
     tag_name = request.args.get("tag", "")
+
     query = Post.query
+
+    # 1. Filter by Search
     if search_query:
         query = query.filter(
             Post.title.contains(search_query) | Post.content.contains(search_query)
         )
-    if cat_name:
-        query = (
-            query.join(post_categories).join(Category).filter(Category.name == cat_name)
-        )
-    if tag_name:
-        query = query.join(post_tags).join(Tag).filter(Tag.name == tag_name)
 
+    # 2. Filter by Category
+    if cat_name:
+        query = query.join(Post.categories).filter(Category.name == cat_name)
+
+    # 3. Filter by Tag
+    if tag_name:
+        query = query.join(Post.tags).filter(Tag.name == tag_name)
+
+    # 4. Fetch the posts
     posts = query.order_by(Post.created_at.desc()).all()
+
+    # 5. Fetch Sidebar Data (Crucial for the widgets to appear)
+    categories = Category.query.all()
+    all_tags = Tag.query.all()
+
     return render_template(
-        "index.html", posts=posts, current_cat=cat_name, current_tag=tag_name
+        "index.html",
+        posts=posts,
+        categories=categories,
+        all_tags=all_tags,
+        current_cat=cat_name,
+        current_tag=tag_name,
     )
 
 
@@ -132,6 +148,16 @@ def new_post():
         selected_cat_ids = request.form.getlist(
             "categories"
         )  # Gets list of IDs from checkboxes
+
+        slug = re.sub(r"[-\s]+", "-", re.sub(r"[^\w\s-]", "", title).strip().lower())
+        post = Post(title=title, slug=slug, content=content)
+
+        # Add existing categories by ID
+        for cid in selected_cat_ids:
+            cat = Category.query.get(cid)
+            if cat:
+                post.categories.append(cat)
+
         tags_input = request.form.get("tags", "")
         if tags_input:
             # Split by comma, remove whitespace, and ignore empty strings
@@ -142,15 +168,6 @@ def new_post():
                     tag = Tag(name=name)
                     db.session.add(tag)
                 post.tags.append(tag)
-
-        slug = re.sub(r"[-\s]+", "-", re.sub(r"[^\w\s-]", "", title).strip().lower())
-        post = Post(title=title, slug=slug, content=content)
-
-        # Add existing categories by ID
-        for cid in selected_cat_ids:
-            cat = Category.query.get(cid)
-            if cat:
-                post.categories.append(cat)
 
         db.session.add(post)
         db.session.commit()
@@ -209,13 +226,17 @@ def edit_post(post_id):
     )
 
 
-@app.route("/admin/delete/<int:post_id>", methods=["POST"])
+@app.route("/admin/delete/<int:post_id>", methods=["GET", "POST"])
 @login_required
 def delete_post(post_id):
     post = Post.query.get_or_404(post_id)
+    if not post:
+        flash("Post not found.")
+        return redirect(url_for("index"))
 
     # Remove associations in the many-to-many table first (SQLAlchemy usually handles this, but being explicit is safer)
     post.categories = []
+    post.tags = []
 
     db.session.delete(post)
     db.session.commit()
