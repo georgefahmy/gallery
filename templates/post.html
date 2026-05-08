@@ -55,6 +55,11 @@
         border-radius: 4px;
         margin: 20px 0;
         display: block;
+        cursor: zoom-in; /* Let's you know it's clickable */
+        transition: opacity 0.2s;
+    }
+    .post-content img:hover {
+        opacity: 0.9;
     }
 
     .post-content iframe.ql-video {
@@ -109,6 +114,38 @@
         .post-container { padding: 25px; margin: 10px; }
         .post-header h1 { font-size: 1.8rem; }
     }
+
+    .lightbox {
+        display: none; /* Hidden by default */
+        position: fixed;
+        z-index: 3000; /* Keep this higher than your sticky header */
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.85); /* Dark semi-transparent background */
+        align-items: center;
+        justify-content: center;
+        cursor: zoom-out; /* Clicking anywhere closes it */
+    }
+
+    .lightbox-content {
+        max-width: 90%;
+        max-height: 90vh;
+        border-radius: 4px;
+        box-shadow: 0 5px 25px rgba(0,0,0,0.5);
+        object-fit: contain;
+    }
+
+    .lightbox-close {
+        position: absolute;
+        top: 20px;
+        right: 30px;
+        color: white;
+        font-size: 40px;
+        font-weight: bold;
+        cursor: pointer;
+    }
 </style>
 
 <article class="post-container">
@@ -119,8 +156,14 @@
             {% for cat in post.categories %}
                 <a href="/?category={{ cat.name }}" class="category-link" style="color: var(--accent-color); text-decoration: none; font-weight: bold;">{{ cat.name }}</a>{{ ", " if not loop.last }}
             {% endfor %}
+
         </div>
         <h1>{{ post.title }}</h1>
+        <div class="nav-links">
+            {% if current_user.is_authenticated %}
+                <a href="{{ url_for('edit_post', post_id=post.id) }}" style="color: var(--accent-color);">Edit Post</a>
+            {% endif %}
+        </div>
     </header>
 
     <div class="post-content">
@@ -136,13 +179,41 @@
             {% endfor %}
         </div>
         {% endif %}
+        <a href="{{ url_for('index') }}" style="padding-right: 15px;">&larr; Back to Feed</a>
 
-        <div class="nav-links">
-            <a href="{{ url_for('index') }}">&larr; Back to Feed</a>
-            {% if current_user.is_authenticated %}
-                <a href="{{ url_for('edit_post', post_id=post.id) }}" style="color: var(--accent-color);">Edit Post</a>
-            {% endif %}
-        </div>
     </footer>
 </article>
+<div id="image-lightbox" class="lightbox" onclick="closeLightbox()">
+    <span class="lightbox-close">&times;</span>
+    <img class="lightbox-content" id="lightbox-img">
+</div>
+<script>
+    // Get the lightbox elements
+    const lightbox = document.getElementById('image-lightbox');
+    const lightboxImg = document.getElementById('lightbox-img');
+
+    // Find all images inside the post content
+    const postImages = document.querySelectorAll('.post-content img');
+
+    // Add a click listener to each image
+    postImages.forEach(img => {
+        img.addEventListener('click', function() {
+            lightbox.style.display = 'flex';
+            lightboxImg.src = this.src;
+        });
+    });
+
+    // Function to close the lightbox
+    function closeLightbox() {
+        lightbox.style.display = 'none';
+        lightboxImg.src = ''; // Clear the image source
+    }
+
+    // Allow closing with the Escape key
+    document.addEventListener('keydown', function(event) {
+        if (event.key === "Escape" && lightbox.style.display === 'flex') {
+            closeLightbox();
+        }
+    });
+</script>
 {% endblock %}

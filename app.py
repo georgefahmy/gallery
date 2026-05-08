@@ -46,8 +46,19 @@ post_categories = db.Table(
     ),
 )
 
+post_tags = db.Table(
+    "post_tags",
+    db.Column("post_id", db.Integer, db.ForeignKey("post.id"), primary_key=True),
+    db.Column("tag_id", db.Integer, db.ForeignKey("tag.id"), primary_key=True),
+)
+
 
 class Category(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False, unique=True)
+
+
+class Tag(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), nullable=False, unique=True)
 
@@ -61,6 +72,11 @@ class Post(db.Model):
     categories = db.relationship(
         "Category",
         secondary=post_categories,
+        backref=db.backref("posts", lazy="dynamic"),
+    )
+    tags = db.relationship(
+        "Tag",
+        secondary=post_tags,
         backref=db.backref("posts", lazy="dynamic"),
     )
 
@@ -88,6 +104,7 @@ def inject_categories():
 def index():
     search_query = request.args.get("search", "")
     cat_name = request.args.get("category", "")
+    tag_name = request.args.get("tag", "")
     query = Post.query
     if search_query:
         query = query.filter(
@@ -97,9 +114,13 @@ def index():
         query = (
             query.join(post_categories).join(Category).filter(Category.name == cat_name)
         )
+    if tag_name:
+        query = query.join(post_tags).join(Tag).filter(Tag.name == tag_name)
 
     posts = query.order_by(Post.created_at.desc()).all()
-    return render_template("index.html", posts=posts, current_cat=cat_name)
+    return render_template(
+        "index.html", posts=posts, current_cat=cat_name, current_tag=tag_name
+    )
 
 
 @app.route("/admin/new_post", methods=["GET", "POST"])
@@ -111,6 +132,16 @@ def new_post():
         selected_cat_ids = request.form.getlist(
             "categories"
         )  # Gets list of IDs from checkboxes
+        tags_input = request.form.get("tags", "")
+        if tags_input:
+            # Split by comma, remove whitespace, and ignore empty strings
+            tag_names = [n.strip() for n in tags_input.split(",") if n.strip()]
+            for name in tag_names:
+                tag = Tag.query.filter_by(name=name).first()
+                if not tag:
+                    tag = Tag(name=name)
+                    db.session.add(tag)
+                post.tags.append(tag)
 
         slug = re.sub(r"[-\s]+", "-", re.sub(r"[^\w\s-]", "", title).strip().lower())
         post = Post(title=title, slug=slug, content=content)
@@ -148,6 +179,16 @@ def edit_post(post_id):
             cat = Category.query.get(cid)
             if cat:
                 post.categories.append(cat)
+
+        post.tags = []
+        tags_input = request.form.get("tags", "")
+        tag_names = [n.strip() for n in tags_input.split(",") if n.strip()]
+        for name in tag_names:
+            tag = Tag.query.filter_by(name=name).first()
+            if not tag:
+                tag = Tag(name=name)
+                db.session.add(tag)
+            post.tags.append(tag)
 
         db.session.commit()
         return redirect(url_for("view_post", slug=post.slug))
@@ -271,12 +312,20 @@ def logout():
     return redirect(url_for("index"))
 
 
+@app.context_processor
+def inject_sidebar_data():
+    return dict(
+        categories=Category.query.order_by(Category.name).all(),
+        all_tags=Tag.query.order_by(Tag.name).all(),  # Add this
+    )
+
+
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
-        if not User.query.filter_by(username="admin").first():
+        if not User.query.filter_by(username="george").first():
             db.session.add(
-                User(username="admin", password=generate_password_hash("admin"))
+                User(username="george", password=generate_password_hash("Soccer10"))
             )
         db.session.commit()
     app.run(debug=True)
