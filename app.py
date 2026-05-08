@@ -194,12 +194,19 @@ def edit_post(post_id):
         return redirect(url_for("view_post", slug=post.slug))
 
     categories = Category.query.order_by(Category.name).all()
+    all_tags = Tag.query.all()
     files = (
         os.listdir(app.config["UPLOAD_FOLDER"])
         if os.path.exists(app.config["UPLOAD_FOLDER"])
         else []
     )
-    return render_template("editor.html", post=post, categories=categories, files=files)
+    return render_template(
+        "editor.html",
+        post=post,
+        categories=categories,
+        all_tags=all_tags,
+        files=files,
+    )
 
 
 @app.route("/admin/delete/<int:post_id>", methods=["POST"])

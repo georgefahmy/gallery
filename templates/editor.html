@@ -44,7 +44,7 @@
     .cat-item { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
     .quick-add { display: flex; gap: 10px; border-top: 1px solid #eee; padding-top: 15px; }
 
-    #editor { height: 500px; background: #fff; }
+    #editor { height: 500px; background: #ffffff; }
 
     .btn-save { width: 100%; background: #28a745; color: white; border: none; padding: 15px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 1rem; margin-top: 10px; }
     .btn-cancel { display: block; text-align: center; margin-top: 15px; color: #666; text-decoration: none; font-size: 0.9rem; }
@@ -109,10 +109,27 @@
 
         <div class="form-group">
             <label>Tags</label>
-            <input type="text" name="tags" placeholder="engine, avionics, panel..."
-                   value="{{ post.tags | map(attribute='name') | join(', ') if post and post.tags else '' }}">
+            <input type="text" name="tags" id="tags-input" placeholder="engine, avionics, panel..."
+                value="{{ post.tags | map(attribute='name') | join(', ') if post and post.tags else '' }}">
             <small style="color: #666; font-size: 0.8rem; display: block; margin-top: 5px;">Separate tags with commas.</small>
+
+            <div id="tag-cloud" style="margin-top: 15px; display: flex; flex-wrap: wrap; gap: 8px;">
+                {% for tag in all_tags %}
+                    <span class="tag-pill"
+                        onclick="addTagToInput('{{ tag.name }}')"
+                        style="background: #e9ecef; color: #495057; padding: 4px 10px; border-radius: 15px; font-size: 0.75rem; cursor: pointer; transition: 0.2s;">
+                        #{{ tag.name }}
+                    </span>
+                {% endfor %}
+            </div>
         </div>
+
+        <style>
+            .tag-pill:hover {
+                background: var(--accent) !important;
+                color: white !important;
+            }
+        </style>
 
         <button type="submit" class="btn-save">Save Post</button>
         <a href="{{ url_for('index') }}" class="btn-cancel">Cancel</a>
@@ -155,6 +172,32 @@
     quill.root.innerHTML = {{ post.content | tojson }};
     {% endif %}
 
+    // --- SLASH COMMAND LOGIC ---
+    quill.on('text-change', function(delta, oldDelta, source) {
+        if (source !== 'user') return;
+
+        // Get the current text and cursor position
+        const selection = quill.getSelection();
+        if (!selection) return;
+
+        const [line, offset] = quill.getLine(selection.index);
+        const textBeforeCursor = line.domNode.textContent.slice(0, offset);
+
+        // Check if the user just finished typing "/image"
+        // This triggers on space or just reaching the end of the string
+        if (textBeforeCursor.endsWith('/image')) {
+            // 1. Calculate the starting index of the string to delete it
+            const startIndex = selection.index - 6;
+
+            // 2. Delete the "/image" text from the editor
+            quill.deleteText(startIndex, 6);
+
+            // 3. Open your existing gallery modal
+            openGallery();
+        }
+    });
+    // --- END SLASH COMMAND LOGIC ---
+
     function addCategory() {
         const nameInput = document.getElementById('new-cat-name');
         const name = nameInput.value.trim();
@@ -177,7 +220,19 @@
             }
         });
     }
+    function addTagToInput(tagName) {
+        const input = document.getElementById('tags-input');
+        let currentTags = input.value.split(',').map(t => t.trim()).filter(t => t !== "");
 
+        if (!currentTags.includes(tagName)) {
+            currentTags.push(tagName);
+            input.value = currentTags.join(', ');
+        }
+
+        // Pulse effect to show it was added
+        input.style.backgroundColor = '#d4edda';
+        setTimeout(() => input.style.backgroundColor = 'white', 300);
+    }
     document.getElementById('post-form').onsubmit = function() {
         document.getElementById('content-input').value = quill.root.innerHTML;
         return true;
@@ -194,8 +249,10 @@
     function insertImage(url) {
         const range = quill.getSelection();
         const position = range ? range.index : quill.getLength();
+        // Use full origin to ensure the path resolves correctly in the editor
         quill.insertEmbed(position, 'image', window.location.origin + url);
         closeGallery();
+        quill.setSelection(position + 1); // Move cursor after the image
     }
 
     window.onclick = function(event) {
