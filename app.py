@@ -1,7 +1,23 @@
 import os
 import re
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+import time
+import threading
+import logging
+
+# from functools import wraps
+from io import StringIO
+from logging.handlers import RotatingFileHandler
+from flask import (
+    Flask,
+    render_template,
+    request,
+    redirect,
+    url_for,
+    flash,
+    jsonify,
+    session,
+)
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
     LoginManager,
@@ -29,6 +45,43 @@ login_manager = LoginManager(app)
 login_manager.login_view = "login"
 
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+
+
+# --- Login attempt logging (split logs) ---
+LOG_DIR = os.path.join(CWD_PATH if "CWD_PATH" in globals() else os.getcwd(), "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+
+log_formatter = logging.Formatter(
+    "%(asctime)s | %(levelname)s | ip=%(ip)s | user=%(user)s | status=%(status)s | ua=%(ua)s | msg=%(message)s"
+)
+
+
+def _create_logger(name, filename):
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+
+    if not logger.handlers:
+        handler = RotatingFileHandler(
+            os.path.join(LOG_DIR, filename), maxBytes=5 * 1024 * 1024, backupCount=5
+        )
+        handler.setFormatter(log_formatter)
+        logger.addHandler(handler)
+
+    return logger
+
+
+login_success_logger = _create_logger("login_success", "login_success.log")
+login_failure_logger = _create_logger("login_failure", "login_failure.log")
+login_security_logger = _create_logger("login_security", "login_security.log")
+
+
+LOGIN_ATTEMPTS = {}
+LOGIN_LOCK = threading.Lock()
+MAX_ATTEMPTS = 3
+BLOCK_WINDOW_SECONDS = 300  # 5 minutes
+BAN_THRESHOLD = 3  # number of times hitting rate limit before ban
+BAN_DURATION_SECONDS = 3600  # 1 hour
 
 
 # --- MODELS ---
@@ -79,6 +132,15 @@ class Post(db.Model):
         secondary=post_tags,
         backref=db.backref("posts", lazy="select"),
     )
+
+
+class BannedIPs(db.Model):
+    __tablename__ = "banned_ips"
+    id = db.Column(db.Integer, primary_key=True)
+    ip = db.Column(db.String(50))
+    username = db.Column(db.String(100))
+    ban_time = db.Column(db.Float, default=0.0)
+    count = db.Column(db.Integer, default=0)
 
 
 @login_manager.user_loader
@@ -323,14 +385,132 @@ def add_category():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    if "user_id" in session:
+        return redirect(url_for("index"))
+
     if request.method == "POST":
-        user = User.query.filter_by(username=request.form.get("username")).first()
-        if user and check_password_hash(user.password, request.form.get("password")):
+        ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+        user_agent = request.headers.get("User-Agent", "")
+        now = time.time()
+        username = request.form.get("username")
+        log_user = username or "-"
+
+        # --- Check ban list (SQLAlchemy) ---
+        ban_entry = BannedIPs.query.filter_by(ip=ip, username=username).first()
+
+        if ban_entry:
+            if now - ban_entry.ban_time < BAN_DURATION_SECONDS:
+                login_security_logger.warning(
+                    "banned_ip_attempt",
+                    extra={
+                        "ip": ip,
+                        "user": log_user,
+                        "status": "banned",
+                        "ua": user_agent,
+                    },
+                )
+                return render_template(
+                    "login.html",
+                    error="Too many attempts. You are temporarily banned.",
+                )
+            else:
+                # Ban expired, remove it
+                db.session.delete(ban_entry)
+                db.session.commit()
+
+        # --- Rate limit check ---
+        with LOGIN_LOCK:
+            attempts = LOGIN_ATTEMPTS.get(ip, [])
+            attempts = [t for t in attempts if now - t < BLOCK_WINDOW_SECONDS]
+            LOGIN_ATTEMPTS[ip] = attempts
+
+            if len(attempts) >= MAX_ATTEMPTS:
+                # Re-fetch ban_entry in case it was deleted above
+                ban_entry = BannedIPs.query.filter_by(ip=ip, username=username).first()
+
+                if ban_entry:
+                    ban_entry.count += 1
+                else:
+                    ban_entry = BannedIPs(ip=ip, username=username, ban_time=0, count=1)
+                    db.session.add(ban_entry)
+
+                # Check if we should elevate to a timed ban
+                if ban_entry.count >= BAN_THRESHOLD:
+                    ban_entry.ban_time = now
+                    db.session.commit()
+
+                    login_security_logger.warning(
+                        "ip_banned",
+                        extra={
+                            "ip": ip,
+                            "user": log_user,
+                            "status": "banned",
+                            "ua": user_agent,
+                        },
+                    )
+                    return render_template(
+                        "login.html",
+                        error="Too many attempts. You are temporarily banned.",
+                    )
+
+                db.session.commit()
+
+                login_security_logger.warning(
+                    "rate_limited",
+                    extra={
+                        "ip": ip,
+                        "user": log_user,
+                        "status": "blocked",
+                        "ua": user_agent,
+                    },
+                )
+                return render_template(
+                    "login.html", error="Too many attempts. Try again later."
+                )
+
+        password = request.form.get("password")
+        user = User.query.filter_by(username=username).first()
+        # user = User.query.filter_by(username=request.form.get("username")).first()
+        if user and check_password_hash(user.password, password):
+            # reset attempts on success
+            with LOGIN_LOCK:
+                LOGIN_ATTEMPTS.pop(ip, None)
+
+            # Clear any ban tracking for this user/ip combo
+            BannedIPs.query.filter_by(ip=ip, username=username).delete()
+            db.session.commit()
+
+            remember = request.form.get("remember") == "on"
+            session["user_id"] = user.id
+            session.permanent = remember
+
+            login_success_logger.info(
+                "login_success",
+                extra={
+                    "ip": ip,
+                    "user": log_user,
+                    "status": "success",
+                    "ua": user_agent,
+                },
+            )
             login_user(user)
-            next_page = request.args.get("next")
-            if not next_page or urlparse(next_page).netloc != "":
-                next_page = url_for("index")
-            return redirect(next_page)
+            return redirect(url_for("index"))
+        else:
+            # record failed attempt
+            with LOGIN_LOCK:
+                LOGIN_ATTEMPTS.setdefault(ip, []).append(time.time())
+
+            login_failure_logger.info(
+                "login_failure",
+                extra={
+                    "ip": ip,
+                    "user": log_user,
+                    "status": "failure",
+                    "ua": user_agent,
+                },
+            )
+            return render_template("login.html", error="Invalid credentials")
+
     return render_template("login.html")
 
 

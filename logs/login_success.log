@@ -1,0 +1,4 @@
+2026-05-13 08:57:52,171 | INFO | ip=127.0.0.1 | user=george | status=success | ua=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 | msg=login_success
+2026-05-13 08:58:09,246 | INFO | ip=127.0.0.1 | user=george | status=success | ua=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 | msg=login_success
+2026-05-13 08:58:29,420 | INFO | ip=127.0.0.1 | user=george | status=success | ua=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 | msg=login_success
+2026-05-13 08:59:12,401 | INFO | ip=127.0.0.1 | user=george | status=success | ua=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 | msg=login_success
